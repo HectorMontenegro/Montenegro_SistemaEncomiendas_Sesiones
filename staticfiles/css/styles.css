@@ -1,0 +1,103 @@
+/* static/css/styles.css */
+
+/* === VARIABLES DE ESTADO === */
+:root {
+    --estado-pendiente: #6c757d;
+    --estado-transito: #0d6efd;
+    --estado-destino: #fd7e14;
+    --estado-entregado: #198754;
+    --estado-devuelto: #dc3545;
+    --color-primary: #0d6efd;
+    --color-bg: #f8f9fa;
+}
+
+body {
+    background-color: var(--color-bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* === CARDS === */
+.card {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+}
+
+.card-header {
+    font-weight: 600;
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* === BADGES DE ESTADO === */
+.badge-estado {
+    display: inline-block;
+    padding: 0.35em 0.85em;
+    border-radius: 50rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.badge-PE { background: #e9ecef; color: #495057; }  /* Pendiente */
+.badge-TR { background: #cfe2ff; color: #084298; }  /* En tránsito */
+.badge-DE { background: #fff3cd; color: #664d03; }  /* En destino */
+.badge-EN { background: #d1e7dd; color: #0a3622; }  /* Entregado */
+.badge-DV { background: #f8d7da; color: #58151c; }  /* Devuelto */
+
+/* === TARJETAS DE ESTADÍSTICAS === */
+.stat-card {
+    border-left: 4px solid;
+}
+
+.stat-card.activas { border-color: var(--estado-transito); }
+.stat-card.retraso { border-color: var(--estado-devuelto); }
+.stat-card.entregadas { border-color: var(--estado-entregado); }
+.stat-card.pendientes { border-color: var(--estado-pendiente); }
+
+/* === TABLAS === */
+.table thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.04);
+}
+
+/* === ANIMACIÓN DE ALERTAS === */
+.alert {
+    animation: fadeAlert 0.3s ease-in;
+}
+
+@keyframes fadeAlert {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* === PAGINACIÓN === */
+.pagination .page-link {
+    color: var(--color-primary);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* === FORMULARIOS === */
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}

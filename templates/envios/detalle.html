@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}{{ encomienda.codigo }} - Detalle{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3">
+        <i class="fas fa-box me-2"></i>{{ encomienda.codigo }}
+    </h2>
+    <div>
+        <a href="{% url 'encomienda_lista' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Volver
+        </a>
+        {% if not encomienda.esta_entregada and not encomienda.estado == 'DV' %}
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEstado">
+            <i class="fas fa-exchange-alt me-1"></i>Cambiar Estado
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Columna principal -->
+    <div class="col-md-8">
+        <!-- Info de encomienda -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white d-flex justify-content-between">
+                <h5 class="mb-0">Información de la Encomienda</h5>
+                <span class="badge-estado badge-{{ encomienda.estado }}">
+                    {{ encomienda.get_estado_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Remitente</p>
+                        <h6>{{ encomienda.remitente.nombre_completo }}</h6>
+                        <small class="text-muted">{{ encomienda.remitente.nro_doc }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Destinatario</p>
+                        <h6>{{ encomienda.destinatario.nombre_completo }}</h6>
+                        <small class="text-muted">{{ encomienda.destinatario.nro_doc }}</small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <p class="text-muted mb-1">Ruta</p>
+                        <h6>{{ encomienda.ruta }}</h6>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="text-muted mb-1">Peso</p>
+                        <h6>{{ encomienda.peso_kg }} kg</h6>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="text-muted mb-1">Costo</p>
+                        <h6>S/ {{ encomienda.costo_envio|floatformat:2 }}</h6>
+                    </div>
+                </div>
+                
+                {% if encomienda.tiene_retraso %}
+                <div class="alert alert-danger mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>¡Retraso!</strong> Esta encomienda tiene {{ encomienda.dias_en_transito }} días en tránsito 
+                    y superó la fecha de entrega estimada ({{ encomienda.fecha_entrega_est|date:'d/m/Y' }}).
+                </div>
+                {% endif %}
+                
+                {% if encomienda.observaciones %}
+                <hr>
+                <p class="text-muted mb-1">Observaciones</p>
+                <p>{{ encomienda.observaciones }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Historial -->
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historial de Estados</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Anterior</th>
+                            <th>Nuevo</th>
+                            <th>Empleado</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in historial %}
+                        <tr>
+                            <td>{{ h.fecha_cambio|date:'d/m/Y H:i' }}</td>
+                            <td>
+                                <span class="badge-estado badge-{{ h.estado_anterior }}">
+                                    {{ h.get_estado_anterior_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-estado badge-{{ h.estado_nuevo }}">
+                                    {{ h.get_estado_nuevo_display }}
+                                </span>
+                            </td>
+                            <td>{{ h.empleado }}</td>
+                            <td>{{ h.observacion|default:'—' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-3 text-muted">Sin cambios registrados</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columna lateral -->
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Detalles del Envío</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <span class="text-muted">Registrado:</span><br>
+                    {{ encomienda.fecha_registro|date:'d/m/Y H:i' }}
+                </p>
+                <p class="mb-2">
+                    <span class="text-muted">Por:</span><br>
+                    {{ encomienda.empleado_registro }}
+                </p>
+                {% if encomienda.fecha_entrega_est %}
+                <p class="mb-2">
+                    <span class="text-muted">Entrega estimada:</span><br>
+                    {{ encomienda.fecha_entrega_est|date:'d/m/Y' }}
+                </p>
+                {% endif %}
+                {% if encomienda.fecha_entrega_real %}
+                <p class="mb-0">
+                    <span class="text-muted">Entrega real:</span><br>
+                    <span class="text-success">{{ encomienda.fecha_entrega_real|date:'d/m/Y' }}</span>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cambiar Estado -->
+{% if not encomienda.esta_entregada and not encomienda.estado == 'DV' %}
+<div class="modal fade" id="modalEstado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'encomienda_cambiar_estado' encomienda.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Cambiar Estado - {{ encomienda.codigo }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Estado actual: 
+                            <span class="badge-estado badge-{{ encomienda.estado }}">
+                                {{ encomienda.get_estado_display }}
+                            </span>
+                        </label>
+                        <select name="estado" class="form-select" required>
+                            {% for valor, etiqueta in encomienda.EstadoEnvio.choices %}
+                            {% if valor != encomienda.estado %}
+                            <option value="{{ valor }}">{{ etiqueta }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea name="observacion" class="form-control" rows="2" placeholder="Motivo del cambio..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

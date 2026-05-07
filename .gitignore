@@ -3,5 +3,7 @@ venv/
 env/
 __pycache__/
 *.pyc
+.git/
 db.sqlite3
+*.log
 .DS_Store
