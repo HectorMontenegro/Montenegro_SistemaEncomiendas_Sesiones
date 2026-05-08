@@ -20,4 +20,18 @@ urlpatterns = [
     
     # API AJAX
     path('api/encomiendas/<int:pk>/estado/', views.encomienda_estado_json, name='encomienda_estado_json'),
+
+        # Carrito de servicios
+    path('carrito/', views.cart_detail, name='cart_detail'),
+    path('carrito/agregar/', views.cart_add, name='cart_add'),
+    path('carrito/eliminar/<str:temp_id>/', views.cart_remove, name='cart_remove'),
+    path('carrito/vaciar/', views.cart_clear, name='cart_clear'),
+    
+    # Checkout y órdenes
+    path('checkout/', views.checkout, name='checkout'),
+    path('ordenes/', views.order_list, name='order_list'),
+    path('ordenes/<uuid:pedido_id>/', views.order_detail, name='order_detail'),
+    
+    # API para paginación infinita
+    path('api/encomiendas/', views.api_encomiendas_list, name='api_encomiendas'),
 ]

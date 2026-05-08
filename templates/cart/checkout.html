@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Finalizar Orden de Servicio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3">
+        <i class="fas fa-clipboard-check me-2"></i>Finalizar Orden de Servicio
+    </h2>
+    <a href="{% url 'cart_detail' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Volver al Carrito
+    </a>
+</div>
+
+<div class="row">
+    <!-- Columna formulario -->
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Datos de la Orden</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="checkoutForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Cliente</label>
+                        <input type="text" class="form-control" value="{{ cliente.nombre_completo }}" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="{{ cliente.email }}" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notas adicionales</label>
+                        <textarea name="notas" class="form-control" rows="3" 
+                                  placeholder="Instrucciones especiales, preferencias de entrega, etc."></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'cart_detail' %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-check me-1"></i>Generar Orden de Servicio
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columna resumen -->
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Resumen</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for item in cart %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="me-auto">
+                            <div class="fw-bold">{{ item.codigo }}</div>
+                            <small class="text-muted">{{ item.descripcion|truncatechars:30 }}</small>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">S/ {{ item.costo_envio|floatformat:2 }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between fw-bold fs-5">
+                    <span>Total:</span>
+                    <span class="text-primary">S/ {{ cart.total_costo|floatformat:2 }}</span>
+                </div>
+                
+                <div class="mt-2 text-muted small text-end">
+                    {{ cart.total_items }} encomienda(s) | {{ cart.total_peso|floatformat:2 }} kg total
+                </div>
+            </div>
+        </div>
+        
+        <!-- Métodos de pago (placeholder para futuro) -->
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Método de Pago</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="payment" id="efectivo" checked disabled>
+                    <label class="form-check-label" for="efectivo">
+                        <i class="fas fa-money-bill-wave me-2 text-success"></i>Pago en agencia
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="payment" id="transferencia" disabled>
+                    <label class="form-check-label text-muted" for="transferencia">
+                        <i class="fas fa-exchange-alt me-2"></i>Transferencia (próximamente)
+                    </label>
+                </div>
+                <small class="text-muted">El pago se procesará en la agencia física.</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

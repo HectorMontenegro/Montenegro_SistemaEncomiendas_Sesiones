@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Catálogo de Encomiendas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3"><i class="fas fa-boxes me-2"></i>Catálogo de Encomiendas</h2>
+    <input type="text" id="searchInput" class="form-control w-auto" placeholder="Buscar...">
+</div>
+
+<div id="encomiendas-container" class="row g-3">
+    <!-- Se cargan vía JS -->
+</div>
+
+<div class="text-center my-4 d-none" id="loading">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+</div>
+
+<div id="sentinel" style="height: 10px;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let nextPage = null;
+    let isLoading = false;
+    const container = document.getElementById('encomiendas-container');
+    const loading = document.getElementById('loading');
+    const searchInput = document.getElementById('searchInput');
+    
+    // Cargar encomiendas
+    async function loadEncomiendas(url, append = false) {
+        if (isLoading) return;
+        isLoading = true;
+        loading.classList.remove('d-none');
+        
+        if (!append) container.innerHTML = '';
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            nextPage = data.has_next ? `/api/encomiendas/?page=${data.next_page}` : null;
+            
+            data.results.forEach(enc => {
+                const card = document.createElement('div');
+                card.className = 'col-md-6 col-lg-4';
+                card.innerHTML = `
+                    <div class="card h-100 shadow-sm fila-link" data-href="${enc.url}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <code>${enc.codigo}</code>
+                                <span class="badge-estado badge-${enc.estado_code}">${enc.estado}</span>
+                            </div>
+                            <h6 class="card-title">${enc.remitente}</h6>
+                            <p class="text-muted small mb-1">
+                                <i class="fas fa-map-marker-alt me-1"></i>${enc.destino}
+                            </p>
+                            <p class="text-muted small mb-0">
+                                <i class="fas fa-calendar me-1"></i>${enc.fecha}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            // Re-aplicar eventos de clic
+            document.querySelectorAll('.fila-link').forEach(el => {
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', () => window.location = el.dataset.href);
+            });
+            
+        } catch (error) {
+            console.error('Error:', error);
+        } finally {
+            loading.classList.add('d-none');
+            isLoading = false;
+        }
+    }
+    
+    // Intersection Observer para scroll infinito
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && nextPage && !isLoading) {
+                loadEncomiendas(nextPage, true);
+            }
+        });
+    }, { rootMargin: '200px' });
+    
+    observer.observe(document.getElementById('sentinel'));
+    
+    // Carga inicial
+    loadEncomiendas('/api/encomiendas/');
+    
+    // Búsqueda con debounce
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const term = e.target.value.trim();
+            const url = term ? `/api/encomiendas/?q=${encodeURIComponent(term)}` : '/api/encomiendas/';
+            loadEncomiendas(url);
+        }, 500);
+    });
+});
+</script>
+{% endblock %}

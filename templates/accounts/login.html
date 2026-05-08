@@ -1,60 +1,42 @@
 {% extends 'base.html' %}
+{% load socialaccount %}
 {% block title %}Iniciar Sesión{% endblock %}
 
-{% block extra_css %}
-<style>
-    .login-container {
-        max-width: 400px;
-        margin: 2rem auto;
-    }
-    .login-logo {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .login-logo i {
-        font-size: 4rem;
-        color: var(--color-primary);
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="login-container">
-    <div class="login-logo">
-        <i class="fas fa-box-open"></i>
+<div class="login-container" style="max-width: 400px; margin: 2rem auto;">
+    <div class="text-center mb-4">
+        <i class="fas fa-box-open fa-3x text-primary"></i>
         <h2 class="mt-3">Sistema de Encomiendas</h2>
-        <p class="text-muted">Ingrese sus credenciales para acceder</p>
     </div>
     
     <div class="card shadow">
         <div class="card-body p-4">
+            <!-- Formulario tradicional -->
             <form method="post">
                 {% csrf_token %}
                 <div class="mb-3">
-                    <label class="form-label">Usuario</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-user"></i></span>
-                        <input type="text" name="username" class="form-control" placeholder="Nombre de usuario" required autofocus>
-                    </div>
+                    <input type="text" name="username" class="form-control" placeholder="Usuario" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Contraseña</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                        <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
-                    </div>
+                    <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
                 </div>
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
-                    </button>
-                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                </button>
             </form>
+            
+            <hr class="my-4">
+            
+            <!-- OAuth -->
+            <div class="text-center">
+                <p class="text-muted small mb-3">O continúa con</p>
+                <div class="d-grid gap-2">
+                    <a href="{% provider_login_url 'google' %}" class="btn btn-outline-danger">
+                        <i class="fab fa-google me-2"></i>Google
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
-    
-    <p class="text-center mt-3 text-muted">
-        <small>¿No tienes cuenta? Contacta al administrador.</small>
-    </p>
 </div>
 {% endblock %}

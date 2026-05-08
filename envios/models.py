@@ -11,6 +11,7 @@ from clientes.models import Cliente
 from rutas.models import Ruta
 from .validators import validar_peso_positivo, validar_codigo_encomienda
 from .querysets import EncomiendaQuerySet
+from django.conf import settings
 
 # ─── Modelo Empleado ─────────────────────────────────────────────
 class Empleado(models.Model):
@@ -272,3 +273,129 @@ class HistorialEstado(models.Model):
     class Meta:
         db_table = 'historial_estados'
         ordering = ['-fecha_cambio']
+
+# SESION 05: modelo para registrar "órdenes de envío" generadas desde el carrito.
+
+# envios/models.py — AÑADIR al final del archivo
+
+import uuid
+from django.conf import settings
+
+
+class EstadoOrden(models.IntegerChoices):
+    PENDIENTE = 1, 'Pendiente'
+    PROCESANDO = 2, 'Procesando'
+    COMPLETADA = 3, 'Completada'
+    CANCELADA = 4, 'Cancelada'
+
+
+class OrdenServicio(models.Model):
+    """
+    Orden de servicio de envío generada desde el carrito.
+    Equivalente a 'OrdenCompraCliente' del PDF pero para encomiendas.
+    """
+    pedido_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nro_pedido = models.CharField(max_length=20, unique=True, editable=False)
+    
+    # Relaciones
+    cliente = models.ForeignKey(
+        'clientes.Cliente',
+        on_delete=models.PROTECT,
+        related_name='ordenes_servicio'
+    )
+    empleado = models.ForeignKey(
+        'Empleado',
+        on_delete=models.PROTECT,
+        related_name='ordenes_registradas',
+        null=True, blank=True
+    )
+    
+    # Totales y estado
+    cantidad_encomiendas = models.PositiveIntegerField(default=0)
+    peso_total_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    costo_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    estado = models.IntegerField(
+        choices=EstadoOrden.choices,
+        default=EstadoOrden.PENDIENTE
+    )
+    
+    notas = models.TextField(blank=True, null=True)
+    
+    # Tracking
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='ordenes_creadas'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'ordenes_servicio'
+        ordering = ['-fecha_creacion']
+        verbose_name = 'Orden de Servicio'
+        verbose_name_plural = 'Órdenes de Servicio'
+    
+    def __str__(self):
+        return f"Orden #{self.nro_pedido} - {self.cliente.nombre_completo}"
+    
+    def generar_nro_pedido(self):
+        """Genera número correlativo: OS-20260507-0001"""
+        from datetime import datetime
+        prefijo = f"OS-{datetime.now().strftime('%Y%m%d')}"
+        ultimo = OrdenServicio.objects.filter(
+            nro_pedido__startswith=prefijo
+        ).order_by('-nro_pedido').first()
+        
+        if ultimo:
+            ultimo_num = int(ultimo.nro_pedido.split('-')[-1])
+            nuevo_num = ultimo_num + 1
+        else:
+            nuevo_num = 1
+        
+        return f"{prefijo}-{nuevo_num:04d}"
+    
+    def save(self, *args, **kwargs):
+        if not self.nro_pedido:
+            self.nro_pedido = self.generar_nro_pedido()
+        super().save(*args, **kwargs)
+    
+    @property
+    def esta_pendiente(self):
+        return self.estado == EstadoOrden.PENDIENTE
+    
+    @property
+    def esta_completada(self):
+        return self.estado == EstadoOrden.COMPLETADA
+
+
+class ItemOrdenServicio(models.Model):
+    """
+    Items de una orden de servicio (encomiendas agrupadas).
+    """
+    item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    orden = models.ForeignKey(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    encomienda = models.OneToOneField(
+        'Encomienda',
+        on_delete=models.PROTECT,
+        related_name='item_orden'
+    )
+    nro_item = models.PositiveIntegerField(default=1)
+    
+    # Datos snapshot (por si cambia la encomienda original)
+    codigo_encomienda = models.CharField(max_length=20)
+    descripcion = models.TextField()
+    peso_kg = models.DecimalField(max_digits=8, decimal_places=2)
+    costo_envio = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    class Meta:
+        db_table = 'items_orden_servicio'
+        ordering = ['nro_item']
+    
+    def __str__(self):
+        return f"{self.nro_item} x {self.codigo_encomienda}"    

@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Carrito de Servicios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3">
+        <i class="fas fa-shopping-cart me-2"></i>Carrito de Servicios
+    </h2>
+    <a href="{% url 'encomienda_crear' %}" class="btn btn-outline-primary">
+        <i class="fas fa-plus me-1"></i>Agregar otra encomienda
+    </a>
+</div>
+
+<div class="card shadow">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Encomiendas pendientes de registro</h5>
+    </div>
+    
+    {% if cart|length > 0 %}
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descripción</th>
+                        <th>Remitente → Destinatario</th>
+                        <th>Ruta</th>
+                        <th>Peso</th>
+                        <th>Costo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td><code>{{ item.item.codigo }}</code></td>
+                        <td>{{ item.item.descripcion|truncatechars:40 }}</td>
+                        <td>
+                            {% if item.remitente %}
+                                {{ item.remitente.nombre_completo|truncatechars:20 }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                            <i class="fas fa-arrow-right text-muted mx-1"></i>
+                            {% if item.destinatario %}
+                                {{ item.destinatario.nombre_completo|truncatechars:20 }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.ruta %}
+                                {{ item.ruta.origen }} → {{ item.ruta.destino }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.item.peso_display }}</td>
+                        <td class="fw-bold text-primary">{{ item.item.costo_display }}</td>
+                        <td>
+                            <a href="{% url 'cart_remove' item.item.temp_id %}" 
+                               class="btn btn-sm btn-outline-danger"
+                               onclick="return confirmar('¿Eliminar esta encomienda del carrito?')">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-group-divider">
+                    <tr class="fw-bold">
+                        <td colspan="4" class="text-end">Totales:</td>
+                        <td>{{ cart.total_peso }} kg</td>
+                        <td class="text-primary">S/ {{ cart.total_costo|floatformat:2 }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card-footer bg-white d-flex justify-content-between">
+        <a href="{% url 'cart_clear' %}" class="btn btn-outline-danger"
+           onclick="return confirmar('¿Vaciar todo el carrito?')">
+            <i class="fas fa-trash me-1"></i>Vaciar Carrito
+        </a>
+        <a href="{% url 'checkout' %}" class="btn btn-success btn-lg">
+            <i class="fas fa-check-circle me-1"></i>Procesar Orden de Servicio
+        </a>
+    </div>
+    
+    {% else %}
+    <div class="card-body text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+        <h4 class="text-muted">Tu carrito está vacío</h4>
+        <p class="text-muted">Agrega encomiendas para generar una orden de servicio agrupada.</p>
+        <a href="{% url 'encomienda_crear' %}" class="btn btn-primary mt-2">
+            <i class="fas fa-plus me-1"></i>Crear Encomienda
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="alert alert-info mt-4">
+    <i class="fas fa-info-circle me-2"></i>
+    <strong>Tip:</strong> Usa el carrito para registrar múltiples encomiendas y generar una sola orden de servicio con código correlativo.
+</div>
+{% endblock %}

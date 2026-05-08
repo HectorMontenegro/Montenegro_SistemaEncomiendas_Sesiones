@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Orden #{{ orden.nro_pedido }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3">
+        <i class="fas fa-file-invoice me-2"></i>Orden de Servicio #{{ orden.nro_pedido }}
+    </h2>
+    <div>
+        <a href="{% url 'order_list' %}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-list me-1"></i>Mis Órdenes
+        </a>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">
+            <i class="fas fa-home me-1"></i>Inicio
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Info de orden -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white d-flex justify-content-between">
+                <h5 class="mb-0">Información de la Orden</h5>
+                <span class="badge {% if orden.esta_pendiente %}bg-warning{% elif orden.esta_completada %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ orden.get_estado_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Número de Orden</p>
+                        <h5>{{ orden.nro_pedido }}</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Fecha de Creación</p>
+                        <h5>{{ orden.fecha_creacion|date:'d/m/Y H:i' }}</h5>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Cliente</p>
+                        <h6>{{ orden.cliente.nombre_completo }}</h6>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Documento</p>
+                        <h6>{{ orden.cliente.nro_doc }}</h6>
+                    </div>
+                </div>
+                
+                {% if orden.notas %}
+                <div class="alert alert-light border">
+                    <p class="text-muted mb-1">Notas:</p>
+                    <p class="mb-0">{{ orden.notas }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Items -->
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Encomiendas incluidas ({{ orden.cantidad_encomiendas }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Peso</th>
+                            <th>Costo</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in orden.items.all %}
+                        <tr>
+                            <td>{{ item.nro_item }}</td>
+                            <td><code>{{ item.codigo_encomienda }}</code></td>
+                            <td>{{ item.descripcion|truncatechars:40 }}</td>
+                            <td>{{ item.peso_kg }} kg</td>
+                            <td>S/ {{ item.costo_envio|floatformat:2 }}</td>
+                            <td>
+                                {% if item.encomienda %}
+                                <span class="badge-estado badge-{{ item.encomienda.estado }}">
+                                    {{ item.encomienda.get_estado_display }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-group-divider">
+                        <tr class="fw-bold">
+                            <td colspan="3" class="text-end">Totales:</td>
+                            <td>{{ orden.peso_total_kg|floatformat:2 }} kg</td>
+                            <td class="text-primary">S/ {{ orden.costo_total|floatformat:2 }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Información del Cliente</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>{{ orden.cliente.nombre_completo }}</strong></p>
+                <p class="text-muted mb-1"><i class="fas fa-id-card me-2"></i>{{ orden.cliente.nro_doc }}</p>
+                <p class="text-muted mb-1"><i class="fas fa-phone me-2"></i>{{ orden.cliente.telefono|default:'—' }}</p>
+                <p class="text-muted mb-0"><i class="fas fa-envelope me-2"></i>{{ orden.cliente.email|default:'—' }}</p>
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Acciones</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="mailto:{{ orden.cliente.email }}?subject=Orden%20{{ orden.nro_pedido }}" 
+                       class="btn btn-outline-secondary">
+                        <i class="fas fa-envelope me-2"></i>Contactar Cliente
+                    </a>
+                    {% if orden.esta_pendiente and user.is_staff %}
+                    <a href="#" class="btn btn-outline-success">
+                        <i class="fas fa-check-circle me-2"></i>Marcar Procesando
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

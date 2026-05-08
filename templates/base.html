@@ -24,15 +24,35 @@
     <!-- Mensajes flash -->
     <main class="container py-4 flex-grow-1">
         {% if messages %}
-        <div class="messages">
+        <div class="container mt-3">
             {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
                 <div class="d-flex align-items-center">
-                    {% if message.tags == 'success' %}<i class="fas fa-check-circle me-2"></i>{% endif %}
-                    {% if message.tags == 'error' %}<i class="fas fa-times-circle me-2"></i>{% endif %}
-                    {% if message.tags == 'warning' %}<i class="fas fa-exclamation-triangle me-2"></i>{% endif %}
-                    {% if message.tags == 'info' %}<i class="fas fa-info-circle me-2"></i>{% endif %}
-                    <div>{{ message }}</div>
+                    {% if message.tags == 'success' %}
+                        <i class="fas fa-check-circle fa-lg me-3 text-success"></i>
+                    {% elif message.tags == 'error' %}
+                        <i class="fas fa-times-circle fa-lg me-3 text-danger"></i>
+                    {% elif message.tags == 'warning' %}
+                        <i class="fas fa-exclamation-triangle fa-lg me-3 text-warning"></i>
+                    {% elif message.tags == 'info' %}
+                        <i class="fas fa-info-circle fa-lg me-3 text-info"></i>
+                    {% else %}
+                        <i class="fas fa-bug fa-lg me-3 text-secondary"></i>
+                    {% endif %}
+                    
+                    <div>
+                        {% if message.tags == 'success' %}
+                            <strong>¡Éxito!</strong>
+                        {% elif message.tags == 'error' %}
+                            <strong>Error</strong>
+                        {% elif message.tags == 'warning' %}
+                            <strong>Atención</strong>
+                        {% elif message.tags == 'info' %}
+                            <strong>Información</strong>
+                        {% endif %}
+                        <br>
+                        {{ message }}
+                    </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
