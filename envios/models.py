@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 import uuid
 
 from config.choices import EstadoGeneral, EstadoEnvio
@@ -58,7 +59,7 @@ class Encomienda(models.Model):
         decimal_places=2,
         validators=[
             validar_peso_positivo,
-            MinValueValidator(0.01, message='El peso mínimo es 0.01kg')
+            MinValueValidator(Decimal('0.01'), message='El peso mínimo es 0.01kg')
         ]
     )
     volumen_cm3 = models.DecimalField(
@@ -199,8 +200,8 @@ class Encomienda(models.Model):
         Calcula el costo del envío basándose en el precio base de la ruta
         y el peso del paquete.
         """
-        PRECIO_POR_KG_EXTRA = 2.50  # soles por kg adicional
-        PESO_BASE = 5.0  # los primeros 5kg están en el precio base
+        PRECIO_POR_KG_EXTRA = Decimal('2.50')  # soles por kg adicional
+        PESO_BASE = Decimal('5.00')  # los primeros 5kg están en el precio base
         
         costo = self.ruta.precio_base
         

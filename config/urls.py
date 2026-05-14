@@ -9,6 +9,8 @@ urlpatterns = [
     path('', include('envios.urls')),  # ← Nuestras URLs
     path('accounts/', include('allauth.urls')),  
     path('accounts/', include('django.contrib.auth.urls')),  # ← Auth de Django (backup)
+    # SESION06 - Django REST Framework
+    path('api/v1/', include('api.urls')),
 ]
 
 # Servir estáticos y media en desarrollo
