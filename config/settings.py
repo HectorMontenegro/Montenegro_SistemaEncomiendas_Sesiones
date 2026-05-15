@@ -13,6 +13,7 @@ from decouple import config
 from pathlib import Path
 from django.contrib.messages import constants as messages
 import os
+import sys
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,14 +27,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', cast=bool, default=False)
+def parse_debug(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'debug', 'dev', 'development'}
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
+
+DEBUG = parse_debug(config('DEBUG', default=False))
+
+ALLOWED_HOSTS = [host.strip() for host in config('ALLOWED_HOSTS', default='').split(',') if host.strip()]
+if DEBUG and not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -122,7 +133,34 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+# --- ASGI application ---
+ASGI_APPLICATION = 'config.asgi.application'
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
 
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [REDIS_URL],
+            'prefix': 'encomiendas',
+            'capacity': 100,
+            'channel_capacity': {
+                'ws.connect.*': 200,
+                'http.request': 200,
+            },
+            'expiry': 60,
+            'group_expiry': 86400,
+        },
+    },
+}
+
+# --- Channel Layer en memoria (solo para tests) ---
+if 'pytest' in sys.modules or 'test' in sys.argv:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
@@ -264,8 +302,6 @@ REST_FRAMEWORK = {
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURACIÓN JWT (JSON Web Tokens)
 # ═══════════════════════════════════════════════════════════════
-
-from datetime import timedelta
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

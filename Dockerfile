@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 # ──5: Copiar el código fuente
 COPY . .
-#6: Exponer puerto
-EXPOSE 8000
+#6: Exponer puerto ASGI
+EXPOSE 8001
 # ──7: Comando de inicio
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8001", "config.asgi:application"]

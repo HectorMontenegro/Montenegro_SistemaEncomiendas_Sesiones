@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
+from rest_framework.exceptions import ValidationError
 
 from envios.models import Encomienda, Empleado, HistorialEstado
 from clientes.models import Cliente
@@ -32,6 +33,22 @@ from .serializers import (
 from .permissions import IsAdminOrReadOnly, IsEmpleadoActivo, IsOwnerOrReadOnly
 from .pagination import EncomiendaPagination, StandardResultsSetPagination
 from .throttling import EncomiendaRateThrottle
+
+
+def resolver_empleado_para_usuario(user, fallback=None):
+    """
+    Busca empleado activo por email del usuario.
+    Si no existe, usa fallback para no cortar operaciones válidas.
+    """
+    empleado = None
+    if getattr(user, 'email', None):
+        empleado = Empleado.objects.filter(
+            email=user.email,
+            estado=EstadoGeneral.ACTIVO
+        ).first()
+    if empleado:
+        return empleado
+    return fallback
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -156,10 +173,9 @@ class EncomiendaViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Asignar empleado automáticamente al crear."""
-        empleado = Empleado.objects.filter(
-            email=self.request.user.email,
-            estado=EstadoGeneral.ACTIVO
-        ).first()
+        empleado = resolver_empleado_para_usuario(self.request.user)
+        if not empleado:
+            raise ValidationError('No tienes perfil de empleado activo.')
         serializer.save(empleado_registro=empleado)
     
     # ═══════════════════════════════════════════════════════════
@@ -193,7 +209,12 @@ class EncomiendaViewSet(viewsets.ModelViewSet):
             )
         
         try:
-            empleado = Empleado.objects.get(email=request.user.email)
+            empleado = resolver_empleado_para_usuario(
+                request.user,
+                fallback=encomienda.empleado_registro
+            )
+            if not empleado:
+                raise Empleado.DoesNotExist()
             encomienda.cambiar_estado(nuevo_estado, empleado, observacion)
             
             return Response({
@@ -262,7 +283,9 @@ class EncomiendaViewSet(viewsets.ModelViewSet):
         GET /api/v1/encomiendas/mi-historial/
         """
         try:
-            empleado = Empleado.objects.get(email=request.user.email)
+            empleado = resolver_empleado_para_usuario(request.user)
+            if not empleado:
+                raise Empleado.DoesNotExist()
             encomiendas = Encomienda.objects.filter(empleado_registro=empleado)
             page = self.paginate_queryset(encomiendas)
             
@@ -278,6 +301,66 @@ class EncomiendaViewSet(viewsets.ModelViewSet):
                 {'error': 'No tienes perfil de empleado.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        """
+        Crea varias encomiendas y reporta progreso por WebSocket.
+        POST /api/v1/encomiendas/bulk-create/
+        Body: [{"codigo": "...", ...}] o {"items": [{...}]}
+        """
+        items = request.data.get('items') if isinstance(request.data, dict) else request.data
+        if not isinstance(items, list) or not items:
+            return Response(
+                {'error': 'Envia una lista de encomiendas o {"items": [...]}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        empleado = resolver_empleado_para_usuario(request.user)
+        if not empleado:
+            return Response(
+                {'error': 'No tienes perfil de empleado activo.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        creadas = []
+        errores = []
+        total = len(items)
+
+        for index, item in enumerate(items, start=1):
+            serializer = EncomiendaCreateSerializer(
+                data=item,
+                context={'request': request},
+            )
+            if serializer.is_valid():
+                encomienda = serializer.save(empleado_registro=empleado)
+                creadas.append(EncomiendaDetailSerializer(encomienda).data)
+                codigo = encomienda.codigo
+            else:
+                errores.append({'index': index, 'errores': serializer.errors})
+                codigo = item.get('codigo') if isinstance(item, dict) else None
+
+            if channel_layer:
+                progreso = {
+                    'type': 'progreso',
+                    'actual': index,
+                    'total': total,
+                    'codigo': codigo,
+                    'porcentaje': round(index / total * 100),
+                }
+                async_to_sync(channel_layer.group_send)('encomiendas_global', progreso)
+                async_to_sync(channel_layer.group_send)('dashboard', progreso)
+
+        http_status = status.HTTP_201_CREATED if not errores else status.HTTP_207_MULTI_STATUS
+        return Response({
+            'creadas': creadas,
+            'errores': errores,
+            'total': total,
+        }, status=http_status)
 
 
 # ═══════════════════════════════════════════════════════════════

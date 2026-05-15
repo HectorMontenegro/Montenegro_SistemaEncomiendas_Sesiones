@@ -2,6 +2,8 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
@@ -193,7 +195,46 @@ class Encomienda(models.Model):
             empleado=empleado,
             observacion=observacion
         )
+        self._notificar_cambio_estado(estado_anterior, nuevo_estado, empleado)
         return self
+
+    def _notificar_cambio_estado(self, estado_anterior, estado_nuevo, empleado):
+        """
+        Publica el cambio en los grupos WebSocket del sistema.
+        El modelo es sincrono; async_to_sync conecta con el channel layer async.
+        """
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+
+        mensaje = {
+            'type': 'encomienda_estado_cambio',
+            'encomienda_id': self.pk,
+            'codigo': self.codigo,
+            'estado_anterior': estado_anterior,
+            'estado_nuevo': estado_nuevo,
+            'empleado': str(empleado),
+            'timestamp': timezone.now().isoformat(),
+        }
+
+        async_to_sync(channel_layer.group_send)('encomiendas_global', mensaje)
+        async_to_sync(channel_layer.group_send)(f'encomienda_{self.pk}', mensaje)
+        async_to_sync(channel_layer.group_send)('dashboard', mensaje)
+
+        hoy = timezone.now().date()
+        stats = {
+            'activas': Encomienda.objects.activas().count(),
+            'en_transito': Encomienda.objects.en_transito().count(),
+            'con_retraso': Encomienda.objects.con_retraso().count(),
+            'entregadas_hoy': Encomienda.objects.filter(
+                estado=EstadoEnvio.ENTREGADO,
+                fecha_entrega_real=hoy
+            ).count(),
+        }
+        async_to_sync(channel_layer.group_send)(
+            'dashboard',
+            {'type': 'dashboard_actualizar', 'stats': stats}
+        )
 
     def calcular_costo(self):
         """

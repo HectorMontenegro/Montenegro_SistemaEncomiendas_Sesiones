@@ -16,7 +16,7 @@
     
     {% block extra_css %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body class="d-flex flex-column min-vh-100" data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}">
     
     <!-- Navbar -->
     {% include 'navbar.html' %}

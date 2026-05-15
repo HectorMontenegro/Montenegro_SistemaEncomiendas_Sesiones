@@ -23,6 +23,19 @@ from rutas.models import Ruta
 from config.choices import EstadoEnvio
 
 
+def resolver_empleado_para_usuario(user, fallback=None):
+    """
+    Obtiene el empleado asociado al usuario autenticado.
+    Prioriza email y usa fallback para no cortar el flujo web.
+    """
+    empleado = None
+    if getattr(user, 'email', None):
+        empleado = Empleado.objects.filter(email=user.email).first()
+    if empleado:
+        return empleado
+    return fallback
+
+
 # ═══════════════════════════════════════════════════════════════
 # AUTENTICACIÓN
 # ═══════════════════════════════════════════════════════════════
@@ -77,21 +90,28 @@ def perfil_view(request):
 def dashboard(request):
     """Vista principal con estadísticas"""
     hoy = timezone.now().date()
-    
-    context = {
-        'total_activas': Encomienda.objects.activas().count(),
+    stats = {
+        'activas': Encomienda.objects.activas().count(),
         'en_transito': Encomienda.objects.en_transito().count(),
         'con_retraso': Encomienda.objects.con_retraso().count(),
         'entregadas_hoy': Encomienda.objects.filter(
             estado=EstadoEnvio.ENTREGADO,
             fecha_entrega_real=hoy
         ).count(),
+    }
+    
+    context = {
+        'total_activas': stats['activas'],
+        'en_transito': stats['en_transito'],
+        'con_retraso': stats['con_retraso'],
+        'entregadas_hoy': stats['entregadas_hoy'],
         'ultimas': Encomienda.objects.con_relaciones()[:10],
-        'stats': [
-            ('Activas', Encomienda.objects.activas().count(), 'primary', 'shipping-fast'),
-            ('En tránsito', Encomienda.objects.en_transito().count(), 'info', 'truck'),
-            ('Con retraso', Encomienda.objects.con_retraso().count(), 'danger', 'exclamation-triangle'),
-            ('Entregadas hoy', Encomienda.objects.filter(estado=EstadoEnvio.ENTREGADO, fecha_entrega_real=hoy).count(), 'success', 'check-circle'),
+        'stats': stats,
+        'stats_cards': [
+            ('Activas', stats['activas'], 'primary', 'shipping-fast', 'stat-activas'),
+            ('En tránsito', stats['en_transito'], 'info', 'truck', 'stat-en-transito'),
+            ('Con retraso', stats['con_retraso'], 'danger', 'exclamation-triangle', 'stat-retraso'),
+            ('Entregadas hoy', stats['entregadas_hoy'], 'success', 'check-circle', 'stat-entregadas'),
         ],
     }
     return render(request, 'envios/dashboard.html', context)
@@ -149,6 +169,7 @@ def encomienda_detalle(request, pk):
     return render(request, 'envios/detalle.html', {
         'encomienda': enc,
         'historial': enc.historial.select_related('empleado').all(),
+        'estados': EstadoEnvio.choices,
     })
 
 
@@ -230,14 +251,22 @@ def encomienda_cambiar_estado(request, pk):
     observacion = request.POST.get('observacion', '')
     
     try:
-        empleado = Empleado.objects.get(email=request.user.email)
+        empleado = resolver_empleado_para_usuario(
+            request.user,
+            fallback=enc.empleado_registro
+        )
+        if not empleado:
+            raise Empleado.DoesNotExist()
         enc.cambiar_estado(nuevo_estado, empleado, observacion)
         messages.success(
             request, 
             f'Estado actualizado a: {enc.get_estado_display()}'
         )
     except (ValueError, Empleado.DoesNotExist) as e:
-        messages.error(request, str(e))
+        if isinstance(e, Empleado.DoesNotExist):
+            messages.error(request, 'No existe un perfil de empleado para registrar el cambio de estado.')
+        else:
+            messages.error(request, str(e))
     
     return redirect('encomienda_detalle', pk=pk)
 
@@ -247,6 +276,9 @@ def encomienda_cambiar_estado(request, pk):
 # ═══════════════════════════════════════════════════════════════
 
 from django.http import JsonResponse
+from django.conf import settings
+from django.db import connection
+import redis
 
 @login_required
 def encomienda_estado_json(request, pk):
@@ -259,6 +291,62 @@ def encomienda_estado_json(request, pk):
         'retraso': enc.tiene_retraso,
         'dias': enc.dias_en_transito,
     })
+
+
+def health_check(request):
+    """
+    Verifica PostgreSQL, Redis y el channel layer usado por WebSockets.
+    """
+    estado = {
+        'postgres': False,
+        'redis': False,
+        'channels': False,
+    }
+
+    try:
+        connection.ensure_connection()
+        estado['postgres'] = True
+    except Exception as exc:
+        estado['postgres_error'] = str(exc)
+
+    redis_client = None
+    try:
+        redis_client = redis.from_url(
+            settings.REDIS_URL,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        redis_client.ping()
+        info = redis_client.info()
+        estado['redis'] = True
+        estado['redis_memoria'] = info.get('used_memory_human')
+        estado['redis_clientes'] = info.get('connected_clients')
+        estado['redis_version'] = info.get('redis_version')
+    except Exception as exc:
+        estado['redis_error'] = str(exc)
+
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'health_check',
+            {'type': 'health.ping'}
+        )
+        estado['channels'] = True
+    except Exception as exc:
+        estado['channels_error'] = str(exc)
+
+    try:
+        redis_client = redis_client or redis.from_url(settings.REDIS_URL)
+        estado['empleados_conectados'] = redis_client.scard(
+            'encomiendas:group:encomiendas_global'
+        )
+    except Exception:
+        estado['empleados_conectados'] = None
+
+    todo_ok = all([estado['postgres'], estado['redis'], estado['channels']])
+    return JsonResponse(estado, status=200 if todo_ok else 503)
 
 # envios/views.py — AÑADIR al final del archivo existente
 
@@ -548,6 +636,7 @@ def encomienda_detalle_mejorado(request, pk):
         'encomienda': enc,
         'historial': enc.historial.select_related('empleado').all(),
         'recientes': recientes,
+        'estados': EstadoEnvio.choices,
     })
 
 

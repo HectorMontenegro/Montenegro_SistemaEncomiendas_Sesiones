@@ -1,6 +1,7 @@
 # envios/urls.py
 from django.urls import path
 from . import views
+from . import views_async
 
 urlpatterns = [
     # Auth
@@ -20,6 +21,9 @@ urlpatterns = [
     
     # API AJAX
     path('api/encomiendas/<int:pk>/estado/', views.encomienda_estado_json, name='encomienda_estado_json'),
+    path('api/dashboard/stats-async/', views_async.dashboard_stats_async, name='dashboard_stats_async'),
+    path('api/encomiendas/<int:pk>/estado-async/', views_async.cambiar_estado_async, name='encomienda_cambiar_estado_async'),
+    path('health/', views.health_check, name='health'),
 
         # Carrito de servicios
     path('carrito/', views.cart_detail, name='cart_detail'),

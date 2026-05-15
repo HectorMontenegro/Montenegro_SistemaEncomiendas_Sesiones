@@ -25,7 +25,7 @@
         <div class="card shadow mb-4">
             <div class="card-header bg-white d-flex justify-content-between">
                 <h5 class="mb-0">Información de la Encomienda</h5>
-                <span class="badge-estado badge-{{ encomienda.estado }}">
+                <span id="encomienda-estado-badge" class="badge-estado badge-{{ encomienda.estado }}">
                     {{ encomienda.get_estado_display }}
                 </span>
             </div>
@@ -168,7 +168,7 @@
                             </span>
                         </label>
                         <select name="estado" class="form-select" required>
-                            {% for valor, etiqueta in encomienda.EstadoEnvio.choices %}
+                            {% for valor, etiqueta in estados %}
                             {% if valor != encomienda.estado %}
                             <option value="{{ valor }}">{{ etiqueta }}</option>
                             {% endif %}
@@ -189,4 +189,39 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const WS_DETALLE_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/encomiendas/{{ encomienda.pk }}/';
+const ESTADOS_DETALLE = { PE: 'Pendiente', TR: 'En transito', DE: 'En destino', EN: 'Entregado', DV: 'Devuelto' };
+let detalleSocket;
+let detalleReconnectAttempts = 0;
+
+function actualizarEstadoDetalle(data) {
+    const badge = document.getElementById('encomienda-estado-badge');
+    if (!badge) return;
+    badge.textContent = ESTADOS_DETALLE[data.estado_nuevo] || data.estado_nuevo;
+    badge.className = 'badge-estado badge-' + data.estado_nuevo;
+}
+
+function conectarDetalle() {
+    detalleSocket = new WebSocket(WS_DETALLE_URL);
+    detalleSocket.onopen = function() {
+        detalleReconnectAttempts = 0;
+    };
+    detalleSocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.tipo === 'estado_cambio') actualizarEstadoDetalle(data);
+    };
+    detalleSocket.onclose = function(event) {
+        if (event.code === 4001 || event.code === 1000) return;
+        detalleReconnectAttempts += 1;
+        const delay = Math.min(30000, 1000 * (2 ** detalleReconnectAttempts));
+        setTimeout(conectarDetalle, delay);
+    };
+}
+
+document.addEventListener('DOMContentLoaded', conectarDetalle);
+</script>
 {% endblock %}
